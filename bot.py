@@ -42,6 +42,21 @@ def _b(label, cb):  return InlineKeyboardButton(label, callback_data=cb)
 def _url(label, u): return InlineKeyboardButton(label, url=u)
 def _back(cb, lng): return _b(t(lng, "back"), cb)
 
+def _get_safe_url(j):
+    """Ensures the URL is valid for Telegram buttons (must have http/https)."""
+    url = str(j.get("apply_url", "")).strip()
+    
+    if not url or url == "N/A" or url == "#":
+        url = str(j.get("source", "")).strip()
+        
+    if not url or url == "N/A" or url == "#":
+        return f"https://t.me/{BOT_USERNAME}"
+        
+    if not url.startswith("http://") and not url.startswith("https://"):
+        return "https://" + url
+        
+    return url
+
 def _fmt_job(j, lng):
     """Formats and displays structural job requirement fields."""
     today = str(datetime.date.today())
@@ -70,9 +85,9 @@ def _fmt_job(j, lng):
     )
 
 def _job_keyboard(j, lng, back_cb="main_menu"):
-    url = str(j.get("apply_url", "#"))
+    safe_url = _get_safe_url(j)
     return InlineKeyboardMarkup([
-        [_url(t(lng, "apply"), url)],
+        [_url(t(lng, "apply"), safe_url)],
         [_b(t(lng, "track"), f"track:{j.get('id')}")],
         [_back(back_cb, lng)]
     ])
@@ -158,6 +173,12 @@ async def inline_search(upd: Update, ctx):
     for j in results[:15]:
         job_text = _fmt_job(j, lng)
         
+        safe_url = _get_safe_url(j)
+        
+        inline_kb = InlineKeyboardMarkup([
+            [_url(t(lng, "apply"), safe_url)]
+        ])
+        
         inline_results.append(
             InlineQueryResultArticle(
                 id=str(uuid.uuid4()), 
@@ -166,7 +187,8 @@ async def inline_search(upd: Update, ctx):
                 input_message_content=InputTextMessageContent(
                     message_text=job_text, 
                     parse_mode="Markdown"
-                )
+                ),
+                reply_markup=inline_kb
             )
         )
     
